@@ -53,6 +53,42 @@ pub mod multisig {
         Ok(())
     }
 
+    pub fn delete_transaction(ctx: Context<DeleteTransaction>) -> Result<()> {
+        let num_signers = ctx
+            .accounts
+            .transaction
+            .signers
+            .iter()
+            .fold(0, |acc, did_sign| if *did_sign { acc + 1 } else { acc });
+        if num_signers != 1 {
+            return Err(ErrorCode::TransactionAlreadySigned.into());
+        }
+        let owner_index = ctx
+            .accounts
+            .multisig
+            .owners
+            .iter()
+            .position(|a| a == ctx.accounts.owner.key)
+            .ok_or(ErrorCode::InvalidOwner)?;
+        if !ctx.accounts.transaction.signers[owner_index] {
+            return Err(ErrorCode::UnableToDelete.into());
+        }
+
+        let tx_lamports = ctx.accounts.transaction.to_account_info().lamports();
+        let to_lamports = ctx.accounts.owner.lamports();
+        **ctx.accounts.owner.lamports.borrow_mut() = to_lamports
+            .checked_add(tx_lamports)
+            .ok_or(ErrorCode::Overflow)?;
+        **ctx
+            .accounts
+            .transaction
+            .to_account_info()
+            .lamports
+            .borrow_mut() = 0;
+
+        Ok(())
+    }
+
     pub fn approve(ctx: Context<Approve>) -> Result<()> {
         let owner_index = ctx
             .accounts
@@ -138,6 +174,15 @@ pub struct CreateTransaction<'info> {
 }
 
 #[derive(Accounts)]
+pub struct DeleteTransaction<'info> {
+    multisig: ProgramAccount<'info, Multisig>,
+    #[account(belongs_to = multisig)]
+    transaction: ProgramAccount<'info, Transaction>,
+    #[account(signer)]
+    owner: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
 pub struct Approve<'info> {
     multisig: ProgramAccount<'info, Multisig>,
     #[account(mut, belongs_to = multisig)]
@@ -179,6 +224,8 @@ pub struct Multisig {
 
 #[account]
 pub struct Transaction {
+    // The multisig account this transaction belongs to.
+    multisig: Pubkey,
     // Target program to execute against.
     program_id: Pubkey,
     // Accounts requried for the transaction.
@@ -187,8 +234,6 @@ pub struct Transaction {
     data: Vec<u8>,
     // signers[index] is true iff multisig.owners[index] signed the transaction.
     signers: Vec<bool>,
-    // The multisig account this transaction belongs to.
-    multisig: Pubkey,
     // Boolean ensuring one time execution.
     did_execute: bool,
 }
@@ -225,5 +270,10 @@ pub enum ErrorCode {
     InvalidOwner,
     #[msg("Not enough owners signed this transaction.")]
     NotEnoughSigners,
-    Unknown,
+    #[msg("Cannot delete a transaction that has been signed by an owner.")]
+    TransactionAlreadySigned,
+    #[msg("Overflow when adding.")]
+    Overflow,
+    #[msg("Cannot delete a transaction the owner did not create.")]
+    UnableToDelete,
 }
