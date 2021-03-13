@@ -21,7 +21,7 @@ pub fn generate(program: Program) -> proc_macro2::TokenStream {
 
     quote! {
         // TODO: remove once we allow segmented paths in `Accounts` structs.
-        use #mod_name::*;
+        use crate::#mod_name::*;
 
         #[cfg(not(feature = "no-entrypoint"))]
         anchor_lang::solana_program::entrypoint!(entry);
