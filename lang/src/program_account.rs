@@ -46,6 +46,9 @@ impl<'a, T: AccountSerialize + AccountDeserialize + Clone> ProgramAccount<'a, T>
     #[inline(never)]
     pub fn try_from_init(info: &AccountInfo<'a>) -> Result<ProgramAccount<'a, T>, ProgramError> {
         let mut data: &[u8] = &info.try_borrow_data()?;
+        if data.len() < 8 {
+            return Err(ProgramError::AccountDataTooSmall);
+        }
 
         // The discriminator should be zero, since we're initializing.
         let mut disc_bytes = [0u8; 8];
