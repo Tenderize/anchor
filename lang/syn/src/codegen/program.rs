@@ -27,6 +27,7 @@ pub fn generate(program: Program) -> proc_macro2::TokenStream {
         anchor_lang::solana_program::entrypoint!(entry);
         #[cfg(not(feature = "no-entrypoint"))]
         fn entry(program_id: &Pubkey, accounts: &[AccountInfo], ix_data: &[u8]) -> ProgramResult {
+            msg!("Starting {}", stringify!(#mod_name));
             if ix_data.len() < 8 {
                 return Err(ProgramError::Custom(99));
             }
