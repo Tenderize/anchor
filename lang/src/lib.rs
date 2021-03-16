@@ -56,7 +56,7 @@ pub use anchor_attribute_state::state;
 pub use anchor_derive_accounts::Accounts;
 /// Borsh is the default serialization format for instructions and accounts.
 pub use borsh::{BorshDeserialize as AnchorDeserialize, BorshSerialize as AnchorSerialize};
-pub use error::Error;
+pub use error::AnchorError;
 pub use solana_program;
 
 /// A data structure of validated accounts that can be deserialized from the
