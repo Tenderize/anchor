@@ -136,7 +136,8 @@ pub fn parse(filename: impl AsRef<Path>) -> Result<Idl> {
             }
         },
     };
-    let error = parse_error_enum(&f).map(|mut e| error::parse(&mut e));
+    /*
+    let error = parse_error_enum(&f).map(|mut e| error::parse_enum(&mut e));
     let error_codes = error.as_ref().map(|e| {
         e.codes
             .iter()
@@ -146,7 +147,7 @@ pub fn parse(filename: impl AsRef<Path>) -> Result<Idl> {
                 msg: code.msg.clone(),
             })
             .collect::<Vec<IdlErrorCode>>()
-    });
+    });*/
 
     let instructions = p
         .ixs
@@ -181,17 +182,17 @@ pub fn parse(filename: impl AsRef<Path>) -> Result<Idl> {
     let mut types = vec![];
     let ty_defs = parse_ty_defs(&f)?;
 
-    let error_name = error.map(|e| e.name).unwrap_or_else(|| "".to_string());
+    // let error_name = error.map(|e| e.name).unwrap_or_else(|| "".to_string());
 
     for ty_def in ty_defs {
         // Don't add the error type to the types or accounts sections.
-        if ty_def.name != error_name {
-            if acc_names.contains(&ty_def.name) {
-                accounts.push(ty_def);
-            } else {
-                types.push(ty_def);
-            }
+        // if ty_def.name != error_name {
+        if acc_names.contains(&ty_def.name) {
+            accounts.push(ty_def);
+        } else {
+            types.push(ty_def);
         }
+        // }
     }
 
     Ok(Idl {
@@ -201,7 +202,7 @@ pub fn parse(filename: impl AsRef<Path>) -> Result<Idl> {
         instructions,
         types,
         accounts,
-        errors: error_codes,
+        errors: None,
         metadata: None,
     })
 }
@@ -231,7 +232,7 @@ fn parse_program_mod(f: &syn::File) -> syn::ItemMod {
     }
     mods[0].clone()
 }
-
+/*
 fn parse_error_enum(f: &syn::File) -> Option<syn::ItemEnum> {
     f.items
         .iter()
@@ -241,6 +242,9 @@ fn parse_error_enum(f: &syn::File) -> Option<syn::ItemEnum> {
                     .attrs
                     .iter()
                     .filter(|attr| {
+                        if attr.path.is_ident("derive") {
+
+                        }
                         let segment = attr.path.segments.last().unwrap();
                         segment.ident == "error"
                     })
@@ -255,7 +259,7 @@ fn parse_error_enum(f: &syn::File) -> Option<syn::ItemEnum> {
         })
         .next()
         .cloned()
-}
+}*/
 // Parse all structs implementing the `Accounts` trait.
 fn parse_accounts(f: &syn::File) -> HashMap<String, AccountsStruct> {
     f.items

@@ -5,8 +5,10 @@ use crate::idl::{IdlAccount, IdlAccountItem, IdlAccounts};
 use anyhow::Result;
 #[cfg(feature = "idl")]
 use heck::MixedCase;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
+use syn::{Fields, Generics, Ident, ItemStruct, LitInt, LitStr, Variant};
 
 pub mod codegen;
 #[cfg(feature = "hash")]
@@ -213,6 +215,10 @@ impl Field {
                     Sysvar<#account>
                 }
             }
+            Ty::ChunkAccount(ty) => {
+                let item = &ty.item_ident;
+                quote! { ChunkAccount<#item> }
+            }
         };
 
         quote! {
@@ -229,6 +235,7 @@ pub enum Ty {
     ProgramAccount(ProgramAccountTy),
     CpiAccount(CpiAccountTy),
     Sysvar(SysvarTy),
+    ChunkAccount(ChunkAccountTy),
 }
 
 #[derive(Debug, PartialEq)]
@@ -260,6 +267,12 @@ pub struct ProgramAccountTy {
 pub struct CpiAccountTy {
     // The struct type of the account.
     pub account_ident: syn::Ident,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ChunkAccountTy {
+    // The struct type of the account.
+    pub item_ident: syn::Ident,
 }
 
 // An access control constraint for an account.
@@ -302,18 +315,49 @@ pub enum ConstraintRentExempt {
 pub struct ConstraintSeeds {
     pub seeds: proc_macro2::Group,
 }
-
 #[derive(Debug)]
-pub struct Error {
-    pub name: String,
-    pub raw_enum: syn::ItemEnum,
-    pub ident: syn::Ident,
-    pub codes: Vec<ErrorCode>,
+pub enum ErrorItem {
+    Enum(ErrorEnum),
+    Struct(ErrorStruct),
 }
 
 #[derive(Debug)]
-pub struct ErrorCode {
-    pub id: u32,
+pub struct ErrorEnum {
+    // pub name: String,
     pub ident: syn::Ident,
-    pub msg: Option<String>,
+    pub generics: Generics,
+    pub variants: Vec<ErrorVariant>,
+    pub custom_code_range: Option<Range<u32>>,
+}
+
+#[derive(Debug)]
+pub struct ErrorStruct {
+    pub ident: Ident,
+    pub fields: Fields,
+    pub target: ErrorTarget,
+    pub message: Option<ErrorVariantMessage>,
+    pub raw: ItemStruct,
+}
+
+#[derive(Debug)]
+pub struct ErrorVariant {
+    pub ident: Ident,
+    pub fields: Fields,
+    pub target: ErrorTarget,
+    pub message: Option<ErrorVariantMessage>,
+    pub raw: Variant,
+}
+
+#[derive(Debug)]
+pub enum ErrorTarget {
+    Custom(Option<LitInt>),
+    Alias(Ident),
+    From { field_index: usize },
+}
+
+#[derive(Debug)]
+pub struct ErrorVariantMessage {
+    pub format: LitStr,
+    pub positinal_args: TokenStream,
+    pub named_args: TokenStream,
 }

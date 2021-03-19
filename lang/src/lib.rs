@@ -20,7 +20,6 @@
 //! [repository](https://github.com/project-serum/anchor).
 //!
 //! Presented here are the Rust primitives for building on Solana.
-
 extern crate self as anchor_lang;
 
 use solana_program::account_info::AccountInfo;
@@ -31,6 +30,7 @@ use std::io::Write;
 
 mod account_info;
 mod boxed;
+mod chunked_list;
 mod context;
 mod cpi_account;
 mod ctor;
@@ -41,6 +41,7 @@ mod state;
 mod sysvar;
 mod vec;
 
+pub use crate::chunked_list::{ChunkAccount, ChunkedList};
 pub use crate::context::{Context, CpiContext};
 pub use crate::cpi_account::CpiAccount;
 pub use crate::ctor::Ctor;
@@ -49,11 +50,11 @@ pub use crate::state::ProgramState;
 pub use crate::sysvar::Sysvar;
 pub use anchor_attribute_access_control::access_control;
 pub use anchor_attribute_account::account;
-pub use anchor_attribute_error::error;
 pub use anchor_attribute_interface::interface;
 pub use anchor_attribute_program::program;
 pub use anchor_attribute_state::state;
 pub use anchor_derive_accounts::Accounts;
+pub use anchor_derive_error::AnchorError;
 /// Borsh is the default serialization format for instructions and accounts.
 pub use borsh::{BorshDeserialize as AnchorDeserialize, BorshSerialize as AnchorSerialize};
 pub use error::AnchorError;
@@ -173,8 +174,8 @@ pub trait InstructionData: AnchorSerialize {
 /// All programs should include it via `anchor_lang::prelude::*;`.
 pub mod prelude {
     pub use super::{
-        access_control, account, error, interface, program, state, AccountDeserialize,
-        AccountSerialize, Accounts, AccountsExit, AccountsInit, AnchorDeserialize, AnchorSerialize,
+        access_control, account, interface, program, state, AccountDeserialize, AccountSerialize,
+        Accounts, AccountsExit, AccountsInit, AnchorDeserialize, AnchorError, AnchorSerialize,
         Context, CpiAccount, CpiContext, Ctor, ProgramAccount, ProgramState, Sysvar, ToAccountInfo,
         ToAccountInfos, ToAccountMetas,
     };
