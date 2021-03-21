@@ -1,3 +1,7 @@
+use std::convert::{TryFrom, TryInto};
+
+use syn::{parse::Parse, LitStr};
+
 use crate::{
     AccountField, AccountsStruct, ChunkAccountTy, CompositeField, Constraint, ConstraintBelongsTo,
     ConstraintLiteral, ConstraintOwner, ConstraintRentExempt, ConstraintSeeds, ConstraintSigner,
@@ -242,16 +246,21 @@ fn parse_constraints(anchor: &syn::Attribute) -> (Vec<Constraint>, bool, bool, b
                         }
                         _ => panic!("invalid syntax"),
                     };
-                    let owner = match inner_tts.next().unwrap() {
-                        proc_macro2::TokenTree::Ident(ident) => ident,
+                    match inner_tts.next().unwrap() {
+                        proc_macro2::TokenTree::Ident(owner) => {
+                            let constraint = match owner.to_string().as_str() {
+                                "program" => ConstraintOwner::Program,
+                                "skip" => ConstraintOwner::Skip,
+                                _ => panic!("invalid syntax"),
+                            };
+                            constraints.push(Constraint::Owner(constraint));
+                        }
+                        proc_macro2::TokenTree::Literal(literal) => {
+                            let value = LitStr::new(&literal.to_string(), literal.span());
+                            constraints.push(Constraint::Owner(ConstraintOwner::Value(value)));
+                        }
                         _ => panic!("invalid syntax"),
                     };
-                    let constraint = match owner.to_string().as_str() {
-                        "program" => ConstraintOwner::Program,
-                        "skip" => ConstraintOwner::Skip,
-                        _ => panic!("invalid syntax"),
-                    };
-                    constraints.push(Constraint::Owner(constraint));
                 }
                 "rent_exempt" => {
                     match inner_tts.next() {

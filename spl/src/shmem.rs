@@ -42,8 +42,8 @@ pub struct Ret<'info> {
 #[derive(Accounts)]
 pub struct Shmem<'info> {
     // Shared memory account to write the return value into.
-    #[account(mut, "shmem.owner == shmem_program.key")]
+    #[account(mut, owner = "DynWy94wrWp5RimU49creYMQ5py3Up8BBNS4VA73VCpi")]
     pub shmem: AccountInfo<'info>,
-    #[account("shmem_program.key == &ID")]
+    // #[account(key = "DynWy94wrWp5RimU49creYMQ5py3Up8BBNS4VA73VCpi")]
     pub shmem_program: AccountInfo<'info>,
 }

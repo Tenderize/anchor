@@ -7,18 +7,53 @@ use crate::{
     Accounts, AccountsExit, AnchorDeserialize, AnchorSerialize, ToAccountInfo, ToAccountInfos,
     ToAccountMetas,
 };
-use std::marker::PhantomData;
+use std::{convert::TryInto, marker::PhantomData};
+
+pub enum Error {
+    ZeroChunkSize,
+    TooBigChunkSize(u32),
+}
 #[derive(Clone, Copy, Debug, AnchorDeserialize, AnchorSerialize)]
 pub struct ChunkedList<T> {
-    item_size: u32,
-    chunk_size: u32,  // In items
-    chunk_count: u32, // capacity
-    item_count: u64,
+    pub item_size: u32,
+    pub chunk_size: u32,  // In items
+    pub chunk_count: u32, // capacity
+    pub item_count: u64,
     #[borsh_skip]
     _marker: PhantomData<*const T>,
 }
 
-const MAX_ACCOUNT_SIZE: u32 = 10 * 1024 * 1024;
+impl<T> ChunkedList<T> {
+    pub fn new(item_size: u32, chunk_size: u32) -> Result<Self, Error> {
+        if chunk_size == 0 {
+            return Err(Error::ZeroChunkSize);
+        }
+
+        let result = Self {
+            item_size,
+            chunk_size,
+            chunk_count: 0,
+            item_count: 0,
+            _marker: PhantomData,
+        };
+
+        let account_bytes = result.account_bytes();
+
+        if account_bytes > MAX_ACCOUNT_SIZE {
+            return Err(Error::TooBigChunkSize(
+                (MAX_ACCOUNT_SIZE / item_size as usize).try_into().unwrap(),
+            ));
+        }
+
+        Ok(result)
+    }
+
+    pub fn account_bytes(&self) -> usize {
+        self.item_size as usize * self.chunk_size as usize
+    }
+}
+
+const MAX_ACCOUNT_SIZE: usize = 10 * 1024 * 1024;
 /*
 impl<T> Default for ChunkedList<T> {
     fn default() -> Self {

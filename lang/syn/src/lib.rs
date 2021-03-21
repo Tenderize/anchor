@@ -302,6 +302,7 @@ pub struct ConstraintLiteral {
 #[derive(Debug)]
 pub enum ConstraintOwner {
     Program,
+    Value(LitStr),
     Skip,
 }
 

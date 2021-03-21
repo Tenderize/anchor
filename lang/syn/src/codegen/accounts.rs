@@ -355,9 +355,7 @@ pub fn generate_constraint_signer(f: &Field, _c: &ConstraintSigner) -> proc_macr
 pub fn generate_constraint_literal(c: &ConstraintLiteral) -> proc_macro2::TokenStream {
     let tokens = &c.tokens;
     quote! {
-        if !(#tokens) {
-            return Err(anchor_lang::solana_program::program_error::ProgramError::Custom(1)); // todo: error codes
-        }
+        (#tokens)?;
     }
 }
 
@@ -372,6 +370,11 @@ pub fn generate_constraint_owner(f: &Field, c: &ConstraintOwner) -> proc_macro2:
         ConstraintOwner::Skip => quote! {},
         ConstraintOwner::Program => quote! {
             if #info.owner != program_id {
+                return Err(anchor_lang::solana_program::program_error::ProgramError::Custom(1)); // todo: error codes
+            }
+        },
+        ConstraintOwner::Value(value) => quote! {
+            if *#info.owner != #value.parse().unwrap() {
                 return Err(anchor_lang::solana_program::program_error::ProgramError::Custom(1)); // todo: error codes
             }
         },

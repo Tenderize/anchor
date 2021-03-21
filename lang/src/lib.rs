@@ -41,7 +41,7 @@ mod state;
 mod sysvar;
 mod vec;
 
-pub use crate::chunked_list::{ChunkAccount, ChunkedList};
+pub use crate::chunked_list::{ChunkAccount, ChunkedList, Error as ChunkError};
 pub use crate::context::{Context, CpiContext};
 pub use crate::cpi_account::CpiAccount;
 pub use crate::ctor::Ctor;
