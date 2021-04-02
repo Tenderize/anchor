@@ -36,6 +36,7 @@ pub fn account(
                 format!("{}:{}", namespace, account_name.to_string())
             }
         };
+
         let mut discriminator = [0u8; 8];
         discriminator.copy_from_slice(
             &anchor_syn::hash::hash(discriminator_preimage.as_bytes()).to_bytes()[..8],
@@ -57,7 +58,6 @@ pub fn account(
         }
 
         impl anchor_lang::AccountDeserialize for #account_name {
-
             fn try_deserialize(buf: &mut &[u8]) -> std::result::Result<Self, ProgramError> {
                  if buf.len() < #discriminator.len() {
                     return Err(ProgramError::AccountDataTooSmall);
@@ -73,6 +73,12 @@ pub fn account(
                 let mut data: &[u8] = &buf[8..];
                 AnchorDeserialize::deserialize(&mut data)
                     .map_err(|_| ProgramError::InvalidAccountData)
+            }
+        }
+
+        impl anchor_lang::Discriminator for #account_name {
+            fn discriminator() -> [u8; 8] {
+                #discriminator
             }
         }
     };

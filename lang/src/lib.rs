@@ -42,6 +42,11 @@ mod sysvar;
 mod vec;
 
 pub use crate::chunked_list::{ChunkAccount, ChunkedList, Error as ChunkError};
+// Internal module used by macros.
+pub mod __private {
+    pub use base64;
+}
+
 pub use crate::context::{Context, CpiContext};
 pub use crate::cpi_account::CpiAccount;
 pub use crate::ctor::Ctor;
@@ -50,6 +55,7 @@ pub use crate::state::ProgramState;
 pub use crate::sysvar::Sysvar;
 pub use anchor_attribute_access_control::access_control;
 pub use anchor_attribute_account::account;
+pub use anchor_attribute_event::{emit, event, EventIndex};
 pub use anchor_attribute_interface::interface;
 pub use anchor_attribute_program::program;
 pub use anchor_attribute_state::state;
@@ -170,11 +176,27 @@ pub trait InstructionData: AnchorSerialize {
     fn data(&self) -> Vec<u8>;
 }
 
+/// Calculates the size of an account, which may be larger than the deserialized
+/// data in it. This trait is currently only used for `#[state]` accounts.
+pub trait AccountSize: AnchorSerialize {
+    fn size(&self) -> Result<u64, ProgramError>;
+}
+
+/// The serialized event data to be emitted via a Solana log.
+pub trait EventData: AnchorSerialize + Discriminator {
+    fn data(&self) -> Vec<u8>;
+}
+
+/// 8 byte identifier for a type.
+pub trait Discriminator {
+    fn discriminator() -> [u8; 8];
+}
+
 /// The prelude contains all commonly used components of the crate.
 /// All programs should include it via `anchor_lang::prelude::*;`.
 pub mod prelude {
     pub use super::{
-        access_control, account, interface, program, state, AccountDeserialize, AccountSerialize,
+        access_control, account, emit, event, interface, program, state, AccountDeserialize,
         Accounts, AccountsExit, AccountsInit, AnchorDeserialize, AnchorError, AnchorSerialize,
         Context, CpiAccount, CpiContext, Ctor, ProgramAccount, ProgramState, Sysvar, ToAccountInfo,
         ToAccountInfos, ToAccountMetas,

@@ -1,7 +1,6 @@
 dist: bionic
 language: rust
-rust:
-  - nightly
+rust: nightly-2021-03-25
 cache: cargo
 env:
   - NODE_VERSION="14.7.0"
@@ -44,7 +43,7 @@ jobs:
         - yarn
         - yarn build
     - <<: *examples
-      name: Runs the examples
+      name: Runs the examples 1
       script:
         - pushd client/example && ./run-test.sh && popd
         - pushd examples/sysvars && anchor test && popd
@@ -55,7 +54,12 @@ jobs:
         - pushd examples/interface && anchor test && popd
         - pushd examples/lockup && anchor test && popd
         - pushd examples/misc && anchor test && popd
+        - pushd examples/events && anchor test && popd
         - pushd examples/cashiers-check && anchor test && popd
+        - pushd examples/typescript && yarn && anchor test && popd
+    - <<: *examples
+      name: Runs the examples 2
+      script:
         - pushd examples/tutorial/basic-0 && anchor test && popd
         - pushd examples/tutorial/basic-1 && anchor test && popd
         - pushd examples/tutorial/basic-2 && anchor test && popd

@@ -4,7 +4,7 @@ use crate::config::{read_all_programs, Config, Program};
 use anchor_lang::idl::{IdlAccount, IdlInstruction};
 use anchor_lang::{AccountDeserialize, AnchorDeserialize, AnchorSerialize};
 use anchor_syn::idl::Idl;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Clap;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
@@ -71,6 +71,7 @@ pub enum Command {
         /// url is a localnet.
         #[clap(long)]
         skip_local_validator: bool,
+        file: Option<String>,
     },
     /// Creates a new program.
     New { name: String },
@@ -213,7 +214,8 @@ fn main() -> Result<()> {
         Command::Test {
             skip_deploy,
             skip_local_validator,
-        } => test(skip_deploy, skip_local_validator),
+            file,
+        } => test(skip_deploy, skip_local_validator, file),
         #[cfg(feature = "dev")]
         Command::Airdrop { url } => airdrop(url),
     }
@@ -250,22 +252,26 @@ fn init(name: String, typescript: bool) -> Result<()> {
 
     // Build the test suite.
     fs::create_dir("tests")?;
+    // Build the migrations directory.
+    fs::create_dir("migrations")?;
+
     if typescript {
         // Build typescript config
         let mut ts_config = File::create("tsconfig.json")?;
         ts_config.write_all(template::ts_config().as_bytes())?;
+
+        let mut deploy = File::create("migrations/deploy.ts")?;
+        deploy.write_all(&template::ts_deploy_script().as_bytes())?;
 
         let mut mocha = File::create(&format!("tests/{}.spec.ts", name))?;
         mocha.write_all(template::ts_mocha(&name).as_bytes())?;
     } else {
         let mut mocha = File::create(&format!("tests/{}.js", name))?;
         mocha.write_all(template::mocha(&name).as_bytes())?;
-    }
 
-    // Build the migrations directory.
-    fs::create_dir("migrations")?;
-    let mut deploy = File::create("migrations/deploy.js")?;
-    deploy.write_all(&template::deploy_script().as_bytes())?;
+        let mut deploy = File::create("migrations/deploy.js")?;
+        deploy.write_all(&template::deploy_script().as_bytes())?;
+    }
 
     println!("{} initialized", name);
 
@@ -886,7 +892,7 @@ enum OutFile {
 }
 
 // Builds, deploys, and tests all workspace programs in a single command.
-fn test(skip_deploy: bool, skip_local_validator: bool) -> Result<()> {
+fn test(skip_deploy: bool, skip_local_validator: bool, file: Option<String>) -> Result<()> {
     with_workspace(|cfg, _path, _cargo| {
         // Bootup validator, if needed.
         let validator_handle = match cfg.cluster.url() {
@@ -909,44 +915,66 @@ fn test(skip_deploy: bool, skip_local_validator: bool) -> Result<()> {
                 None
             }
         };
+
         let log_streams = stream_logs(&cfg.cluster.url())?;
 
-        let ts_config_exist = Path::new("tsconfig.json").exists();
+        let result: Result<_> = {
+            let ts_config_exist = Path::new("tsconfig.json").exists();
 
-        // Run the tests.
-        let exit = match ts_config_exist {
-            true => std::process::Command::new("ts-mocha")
-                .arg("-p")
-                .arg("./tsconfig.json")
-                .arg("-t")
-                .arg("1000000")
-                .arg("tests/**/*.spec.ts")
-                .env("ANCHOR_PROVIDER_URL", cfg.cluster.url())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .output()?,
-            false => std::process::Command::new("mocha")
-                .arg("-t")
-                .arg("1000000")
-                .arg("tests/")
-                .env("ANCHOR_PROVIDER_URL", cfg.cluster.url())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .output()?,
+            // Run the tests.
+            let mut args = vec!["-t", "1000000"];
+            if let Some(ref file) = file {
+                args.push(file);
+            } else if ts_config_exist {
+                args.push("tests/**/*.spec.ts");
+            } else {
+                args.push("tests/");
+            }
+            let exit = match ts_config_exist {
+                true => std::process::Command::new("ts-mocha")
+                    .arg("-p")
+                    .arg("./tsconfig.json")
+                    .args(args)
+                    .env("ANCHOR_PROVIDER_URL", cfg.cluster.url())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .output()
+                    .map_err(anyhow::Error::from)
+                    .with_context(|| "ts-mocha"),
+                false => std::process::Command::new("mocha")
+                    .args(args)
+                    .env("ANCHOR_PROVIDER_URL", cfg.cluster.url())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .output()
+                    .map_err(anyhow::Error::from)
+                    .with_context(|| "mocha"),
+            };
+
+            exit
         };
 
-        if !exit.status.success() {
-            if let Some(mut validator_handle) = validator_handle {
-                validator_handle.kill()?;
+        if let Some(mut child) = validator_handle {
+            if let Err(err) = child.kill() {
+                println!("Failed to kill subprocess {}: {}", child.id(), err);
             }
-            std::process::exit(exit.status.code().unwrap());
-        }
-        if let Some(mut validator_handle) = validator_handle {
-            validator_handle.kill()?;
         }
 
-        for mut stream in log_streams {
-            stream.kill()?;
+        for mut child in log_streams {
+            if let Err(err) = child.kill() {
+                println!("Failed to kill subprocess {}: {}", child.id(), err);
+            }
+        }
+
+        match result {
+            Ok(exit) => {
+                if !exit.status.success() {
+                    std::process::exit(exit.status.code().unwrap());
+                }
+            }
+            Err(err) => {
+                println!("Failed to run test: {:#}", err)
+            }
         }
 
         Ok(())
@@ -1182,7 +1210,8 @@ fn launch(url: Option<String>, keypair: Option<String>, verifiable: bool) -> Res
         }
 
         // Run migration script.
-        if Path::new("migrations/deploy.js").exists() {
+        if Path::new("migrations/deploy.js").exists() || Path::new("migrations/deploy.ts").exists()
+        {
             migrate(Some(url))?;
         }
 
@@ -1362,8 +1391,25 @@ fn migrate(url: Option<String>) -> Result<()> {
 
         let url = url.unwrap_or_else(|| cfg.cluster.url().to_string());
         let cur_dir = std::env::current_dir()?;
-        let module_path = format!("{}/migrations/deploy.js", cur_dir.display());
-        let deploy_script_host_str = template::deploy_script_host(&url, &module_path);
+        let module_path = cur_dir.join("migrations/deploy.js");
+
+        let ts_config_exist = Path::new("tsconfig.json").exists();
+        let ts_deploy_file_exists = Path::new("migrations/deploy.ts").exists();
+
+        if ts_config_exist && ts_deploy_file_exists {
+            let ts_module_path = cur_dir.join("migrations/deploy.ts");
+            let exit = std::process::Command::new("tsc")
+                .arg(&ts_module_path)
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .output()?;
+            if !exit.status.success() {
+                std::process::exit(exit.status.code().unwrap());
+            }
+        };
+
+        let deploy_script_host_str =
+            template::deploy_script_host(&url, &module_path.display().to_string());
 
         if !Path::new(".anchor").exists() {
             fs::create_dir(".anchor")?;
@@ -1371,13 +1417,20 @@ fn migrate(url: Option<String>) -> Result<()> {
         std::env::set_current_dir(".anchor")?;
 
         std::fs::write("deploy.js", deploy_script_host_str)?;
-        if let Err(_e) = std::process::Command::new("node")
+        let exit = std::process::Command::new("node")
             .arg("deploy.js")
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
-            .output()
-        {
-            std::process::exit(1);
+            .output()?;
+
+        if ts_config_exist && ts_deploy_file_exists {
+            std::fs::remove_file(&module_path)
+                .map_err(|_| anyhow!("Unable to remove file {}", module_path.display()))?;
+        }
+
+        if !exit.status.success() {
+            println!("Deploy failed.");
+            std::process::exit(exit.status.code().unwrap());
         }
 
         println!("Deploy complete.");
