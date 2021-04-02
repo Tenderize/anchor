@@ -1,7 +1,6 @@
 use proc_macro2::Span;
 use syn::Ident;
 
-pub mod accounts;
 pub mod error;
 pub mod program;
 

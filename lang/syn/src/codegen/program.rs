@@ -17,7 +17,6 @@ pub fn generate(program: Program) -> proc_macro2::TokenStream {
     let methods = generate_methods(&program);
     let ixs = generate_ixs(&program);
     let cpi = generate_cpi(&program);
-    let accounts = generate_accounts(&program);
 
     quote! {
         // TODO: remove once we allow segmented paths in `Accounts` structs.
@@ -55,8 +54,6 @@ pub fn generate(program: Program) -> proc_macro2::TokenStream {
 
             #handlers_non_inlined
         }
-
-        #accounts
 
         #ixs
 
@@ -939,6 +936,7 @@ pub fn generate_ixs(program: &Program) -> proc_macro2::TokenStream {
     }
 }
 
+/*
 fn generate_accounts(program: &Program) -> proc_macro2::TokenStream {
     let mut accounts = std::collections::HashSet::new();
 
@@ -991,6 +989,7 @@ fn generate_accounts(program: &Program) -> proc_macro2::TokenStream {
         }
     }
 }
+*/
 
 fn generate_cpi(program: &Program) -> proc_macro2::TokenStream {
     let cpi_methods: Vec<proc_macro2::TokenStream> = program

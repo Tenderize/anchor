@@ -7,9 +7,16 @@ use anyhow::Result;
 use heck::MixedCase;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use std::{collections::HashMap, ops::Range};
-use syn::{Fields, Generics, Ident, ItemStruct, LitInt, LitStr, Variant};
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut, Range},
+};
+use syn::{
+    punctuated::Punctuated, spanned::Spanned, Fields, Generics, Ident, ItemStruct, LitByteStr,
+    LitInt, LitStr, Token, Variant,
+};
 
+pub mod accounts;
 pub mod codegen;
 #[cfg(feature = "hash")]
 pub mod hash;
@@ -69,254 +76,6 @@ pub struct IxArg {
 }
 
 #[derive(Debug)]
-pub struct AccountsStruct {
-    // Name of the accounts struct.
-    pub ident: syn::Ident,
-    // Generics + lifetimes on the accounts struct.
-    pub generics: syn::Generics,
-    // Fields on the accounts struct.
-    pub fields: Vec<AccountField>,
-}
-
-impl AccountsStruct {
-    pub fn new(strct: syn::ItemStruct, fields: Vec<AccountField>) -> Self {
-        let ident = strct.ident.clone();
-        let generics = strct.generics;
-        Self {
-            ident,
-            generics,
-            fields,
-        }
-    }
-
-    // Returns all program owned accounts in the Accounts struct.
-    //
-    // `global_accs` is given to "link" account types that are embedded
-    // in each other.
-    pub fn account_tys(
-        &self,
-        global_accs: &HashMap<String, AccountsStruct>,
-    ) -> Result<Vec<String>> {
-        let mut tys = vec![];
-        for f in &self.fields {
-            match f {
-                AccountField::Field(f) => {
-                    if let Ty::ProgramAccount(pty) = &f.ty {
-                        tys.push(pty.account_ident.to_string());
-                    }
-                }
-                AccountField::AccountsStruct(comp_f) => {
-                    let accs = global_accs.get(&comp_f.symbol).ok_or_else(|| {
-                        anyhow::format_err!("Invalid account type: {}", comp_f.symbol)
-                    })?;
-                    tys.extend(accs.account_tys(global_accs)?);
-                }
-            }
-        }
-        Ok(tys)
-    }
-
-    #[cfg(feature = "idl")]
-    pub fn idl_accounts(
-        &self,
-        global_accs: &HashMap<String, AccountsStruct>,
-    ) -> Vec<IdlAccountItem> {
-        self.fields
-            .iter()
-            .map(|acc: &AccountField| match acc {
-                AccountField::AccountsStruct(comp_f) => {
-                    let accs_strct = global_accs
-                        .get(&comp_f.symbol)
-                        .expect("Could not reslve Accounts symbol");
-                    let accounts = accs_strct.idl_accounts(global_accs);
-                    IdlAccountItem::IdlAccounts(IdlAccounts {
-                        name: comp_f.ident.to_string().to_mixed_case(),
-                        accounts,
-                    })
-                }
-                AccountField::Field(acc) => IdlAccountItem::IdlAccount(IdlAccount {
-                    name: acc.ident.to_string().to_mixed_case(),
-                    is_mut: acc.is_mut,
-                    is_signer: acc.is_signer,
-                }),
-            })
-            .collect::<Vec<_>>()
-    }
-}
-
-#[derive(Debug)]
-pub enum AccountField {
-    // Use a `String` instead of the `AccountsStruct` because all
-    // accounts structs aren't visible to a single derive macro.
-    //
-    // When we need the global context, we fill in the String with the
-    // appropriate values. See, `account_tys` as an example.
-    AccountsStruct(CompositeField), // Composite
-    Field(Field),                   // Primitive
-}
-
-#[derive(Debug)]
-pub struct CompositeField {
-    pub ident: syn::Ident,
-    pub symbol: String,
-    pub constraints: Vec<Constraint>,
-    pub raw_field: syn::Field,
-}
-
-// An account in the accounts struct.
-#[derive(Debug)]
-pub struct Field {
-    pub ident: syn::Ident,
-    pub ty: Ty,
-    pub constraints: Vec<Constraint>,
-    pub is_mut: bool,
-    pub is_signer: bool,
-    pub is_init: bool,
-}
-
-impl Field {
-    pub fn typed_ident(&self) -> proc_macro2::TokenStream {
-        let name = &self.ident;
-
-        let ty = match &self.ty {
-            Ty::AccountInfo => quote! { AccountInfo },
-            Ty::ProgramState(ty) => {
-                let account = &ty.account_ident;
-                quote! {
-                    ProgramState<#account>
-                }
-            }
-            Ty::ProgramAccount(ty) => {
-                let account = &ty.account_ident;
-                quote! {
-                    ProgramAccount<#account>
-                }
-            }
-            Ty::CpiAccount(ty) => {
-                let account = &ty.account_ident;
-                quote! {
-                    CpiAccount<#account>
-                }
-            }
-            Ty::Sysvar(ty) => {
-                let account = match ty {
-                    SysvarTy::Clock => quote! {Clock},
-                    SysvarTy::Rent => quote! {Rent},
-                    SysvarTy::EpochSchedule => quote! {EpochSchedule},
-                    SysvarTy::Fees => quote! {Fees},
-                    SysvarTy::RecentBlockHashes => quote! {RecentBlockHashes},
-                    SysvarTy::SlotHashes => quote! {SlotHashes},
-                    SysvarTy::SlotHistory => quote! {SlotHistory},
-                    SysvarTy::StakeHistory => quote! {StakeHistory},
-                    SysvarTy::Instructions => quote! {Instructions},
-                    SysvarTy::Rewards => quote! {Rewards},
-                };
-                quote! {
-                    Sysvar<#account>
-                }
-            }
-            Ty::ChunkAccount(ty) => {
-                let item = &ty.item_ident;
-                quote! { ChunkAccount<#item> }
-            }
-        };
-
-        quote! {
-            #name: #ty
-        }
-    }
-}
-
-// A type of an account field.
-#[derive(Debug, PartialEq)]
-pub enum Ty {
-    AccountInfo,
-    ProgramState(ProgramStateTy),
-    ProgramAccount(ProgramAccountTy),
-    CpiAccount(CpiAccountTy),
-    Sysvar(SysvarTy),
-    ChunkAccount(ChunkAccountTy),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum SysvarTy {
-    Clock,
-    Rent,
-    EpochSchedule,
-    Fees,
-    RecentBlockHashes,
-    SlotHashes,
-    SlotHistory,
-    StakeHistory,
-    Instructions,
-    Rewards,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ProgramStateTy {
-    pub account_ident: syn::Ident,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ProgramAccountTy {
-    // The struct type of the account.
-    pub account_ident: syn::Ident,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct CpiAccountTy {
-    // The struct type of the account.
-    pub account_ident: syn::Ident,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct ChunkAccountTy {
-    // The struct type of the account.
-    pub item_ident: syn::Ident,
-}
-
-// An access control constraint for an account.
-#[derive(Debug)]
-pub enum Constraint {
-    Signer(ConstraintSigner),
-    BelongsTo(ConstraintBelongsTo),
-    Literal(ConstraintLiteral),
-    Owner(ConstraintOwner),
-    RentExempt(ConstraintRentExempt),
-    Seeds(ConstraintSeeds),
-}
-
-#[derive(Debug)]
-pub struct ConstraintBelongsTo {
-    pub join_target: proc_macro2::Ident,
-}
-
-#[derive(Debug)]
-pub struct ConstraintSigner {}
-
-#[derive(Debug)]
-pub struct ConstraintLiteral {
-    pub tokens: proc_macro2::TokenStream,
-}
-
-#[derive(Debug)]
-pub enum ConstraintOwner {
-    Program,
-    Value(LitStr),
-    Skip,
-}
-
-#[derive(Debug)]
-pub enum ConstraintRentExempt {
-    Enforce,
-    Skip,
-}
-
-#[derive(Debug)]
-pub struct ConstraintSeeds {
-    pub seeds: proc_macro2::Group,
-}
-#[derive(Debug)]
 pub enum ErrorItem {
     Enum(ErrorEnum),
     Struct(ErrorStruct),
@@ -361,4 +120,48 @@ pub struct ErrorVariantMessage {
     pub format: LitStr,
     pub positinal_args: TokenStream,
     pub named_args: TokenStream,
+}
+
+pub struct WithContext<T, C> {
+    inner: T,
+    context: C,
+}
+
+impl<T, C> WithContext<T, C> {
+    pub fn new(inner: T, context: C) -> Self {
+        Self { inner, context }
+    }
+
+    pub fn context(&self) -> C
+    where
+        C: Clone,
+    {
+        self.context.clone()
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T, C> Deref for WithContext<T, C> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T, C> DerefMut for WithContext<T, C> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+type WithSpan<T> = WithContext<T, Span>;
+
+impl<T> Spanned for WithSpan<T> {
+    fn span(&self) -> Span {
+        self.context()
+    }
 }

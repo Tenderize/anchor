@@ -65,7 +65,7 @@ impl TryFrom<ItemEnum> for ErrorEnum {
         let variants = item_enum
             .variants
             .into_iter()
-            .map(<ErrorVariant as TryFrom<Variant>>::try_from)
+            .map(ErrorVariant::try_from)
             .collect::<Result<Vec<ErrorVariant>>>()?;
 
         Ok(ErrorEnum {

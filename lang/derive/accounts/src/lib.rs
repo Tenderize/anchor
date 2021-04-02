@@ -1,8 +1,8 @@
 extern crate proc_macro;
 
-use anchor_syn::codegen::accounts as accounts_codegen;
-use anchor_syn::parser::accounts as accounts_parser;
+use anchor_syn::accounts::AccountsStruct;
 use proc_macro::TokenStream;
+use quote::ToTokens;
 use syn::parse_macro_input;
 
 /// Implements an [`Accounts`](./trait.Accounts.html) deserializer on the given
@@ -48,7 +48,6 @@ use syn::parse_macro_input;
 /// | `#[account(rent_exempt = <skip>)]` | On `AccountInfo` or `ProgramAccount` structs | Optional attribute to skip the rent exemption check. By default, all accounts marked with `#[account(init)]` will be rent exempt, and so this should rarely (if ever) be used. Similarly, omitting `= skip` will mark the account rent exempt. |
 #[proc_macro_derive(Accounts, attributes(account))]
 pub fn derive_anchor_deserialize(item: TokenStream) -> TokenStream {
-    let strct = parse_macro_input!(item as syn::ItemStruct);
-    let tts = accounts_codegen::generate(accounts_parser::parse(&strct));
-    proc_macro::TokenStream::from(tts)
+    let strct = parse_macro_input!(item as AccountsStruct);
+    strct.to_token_stream().into()
 }

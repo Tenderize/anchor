@@ -1,13 +1,16 @@
 use crate::idl::*;
-use crate::parser::{self, accounts, error, program};
-use crate::{AccountsStruct, StateIx};
+use crate::parser::{self, error, program};
+use crate::{accounts::AccountsStruct, StateIx};
 use anyhow::Result;
 use heck::MixedCase;
 use quote::ToTokens;
-use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryInto,
+};
 
 const DERIVE_NAME: &str = "Accounts";
 
@@ -268,7 +271,7 @@ fn parse_accounts(f: &syn::File) -> HashMap<String, AccountsStruct> {
             syn::Item::Struct(i_strct) => {
                 for attr in &i_strct.attrs {
                     if attr.tokens.to_string().contains(DERIVE_NAME) {
-                        let strct = accounts::parse(i_strct);
+                        let strct: AccountsStruct = i_strct.clone().try_into().unwrap();
                         return Some((strct.ident.to_string(), strct));
                     }
                 }
