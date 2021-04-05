@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use super::{super::constraints::ConstraintExpr, AccountFieldGenerator, MetaAccountFieldGenerator};
 use crate::{
-    accounts::{constraints::Constraint, is_account_attr},
+    accounts::{constraints::SpannedConstraint, is_account_attr},
     WithContext, WithSpan,
 };
 use proc_macro2::{Span, TokenStream};
@@ -120,7 +120,8 @@ pub struct CompositeConstraintsBuilder {
 
 impl CompositeConstraintsBuilder {
     pub fn add_attr(&mut self, attr: &Attribute) -> Result<()> {
-        let components = attr.parse_args_with(Punctuated::<Constraint, Comma>::parse_terminated)?;
+        let components =
+            attr.parse_args_with(Punctuated::<SpannedConstraint, Comma>::parse_terminated)?;
 
         for component in components {
             self.add_constraint(component)?;
@@ -129,9 +130,9 @@ impl CompositeConstraintsBuilder {
         Ok(())
     }
 
-    pub fn add_constraint(&mut self, constraint: Constraint) -> Result<()> {
+    pub fn add_constraint(&mut self, constraint: SpannedConstraint) -> Result<()> {
         match constraint {
-            Constraint::Expr(expr) => self.add_expr(*expr),
+            SpannedConstraint::Expr(expr) => self.add_expr(expr),
             _ => Err(Error::new(
                 constraint.span(),
                 "Invalid constraint for composite field",

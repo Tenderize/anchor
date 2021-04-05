@@ -7,8 +7,9 @@ use super::{AccountFieldGenerator, MetaAccountFieldGenerator, SysvarTy, Ty};
 use crate::{
     accounts::{
         constraints::{
-            Constraint, ConstraintBelongsTo, ConstraintExpr, ConstraintInit, ConstraintMut,
-            ConstraintOwner, ConstraintRentExempt, ConstraintSeeds, ConstraintSigner,
+            ConstraintAddress, ConstraintBelongsTo, ConstraintBump, ConstraintBumpSave,
+            ConstraintExpr, ConstraintInit, ConstraintMut, ConstraintOwner, ConstraintRentExempt,
+            ConstraintSeeds, ConstraintSigner, SpannedConstraint,
         },
         is_account_attr,
     },
@@ -60,7 +61,7 @@ impl AccountFieldGenerator for PlainField {
                 let #name = anchor_lang::Accounts::try_accounts(program_id, accounts)?;
             },
             true => quote! {
-                let #name = anchor_lang::AccountsInit::try_accounts_init(program_id, accounts)?;
+                let mut #name = anchor_lang::AccountsInit::try_accounts_init(program_id, accounts)?;
             },
         }
     }
@@ -182,7 +183,10 @@ pub struct PlainConstraints {
     init: Option<ConstraintInit>,
     is_mut: Option<ConstraintMut>,
     signer: Option<ConstraintSigner>,
+    address: Option<ConstraintAddress>,
     seeds: Option<ConstraintSeeds>,
+    bump: Option<ConstraintBump>,
+    bump_save: Option<ConstraintBumpSave>,
     belongs_to: BTreeSet<ConstraintBelongsTo>,
     owner: Option<ConstraintOwner>,
     rent_exempt: Option<ConstraintRentExempt>,
@@ -241,7 +245,10 @@ pub struct PlainConstraintsBuilder {
     init: Option<ConstraintInit>,
     r#mut: Option<ConstraintMut>,
     signer: Option<ConstraintSigner>,
+    address: Option<ConstraintAddress>,
     seeds: Option<ConstraintSeeds>,
+    bump: Option<ConstraintBump>,
+    bump_save: Option<ConstraintBumpSave>,
     belongs_to: BTreeSet<ConstraintBelongsTo>,
     owner: Option<ConstraintOwner>,
     rent_exempt: Option<ConstraintRentExempt>,
@@ -255,7 +262,10 @@ impl PlainConstraintsBuilder {
             init: None,
             r#mut: None,
             signer: None,
+            address: None,
             seeds: None,
+            bump: None,
+            bump_save: None,
             belongs_to: BTreeSet::new(),
             owner: None,
             rent_exempt: None,
@@ -264,7 +274,8 @@ impl PlainConstraintsBuilder {
     }
 
     pub fn add_attr(&mut self, attr: &Attribute) -> Result<()> {
-        let components = attr.parse_args_with(Punctuated::<Constraint, Comma>::parse_terminated)?;
+        let components =
+            attr.parse_args_with(Punctuated::<SpannedConstraint, Comma>::parse_terminated)?;
 
         for component in components {
             self.add_constraint(component)?;
@@ -273,16 +284,19 @@ impl PlainConstraintsBuilder {
         Ok(())
     }
 
-    pub fn add_constraint(&mut self, constraint: Constraint) -> Result<()> {
+    pub fn add_constraint(&mut self, constraint: SpannedConstraint) -> Result<()> {
         match constraint {
-            Constraint::Init(init) => self.add_init(init),
-            Constraint::Mut(r#mut) => self.add_mut(r#mut),
-            Constraint::Signer(signer) => self.add_signer(signer),
-            Constraint::Seeds(seeds) => self.add_seeds(seeds),
-            Constraint::BelongsTo(belongs_to) => self.add_belongs_to(belongs_to),
-            Constraint::Owner(owner) => self.add_owner(owner),
-            Constraint::RentExempt(rent_exempt) => self.add_rent_exempt(rent_exempt),
-            Constraint::Expr(expr) => self.add_expr(*expr),
+            SpannedConstraint::Init(init) => self.add_init(init),
+            SpannedConstraint::Mut(r#mut) => self.add_mut(r#mut),
+            SpannedConstraint::Signer(signer) => self.add_signer(signer),
+            SpannedConstraint::Address(address) => self.add_address(address),
+            SpannedConstraint::Seeds(seeds) => self.add_seeds(seeds),
+            SpannedConstraint::Bump(bump) => self.add_bump(bump),
+            SpannedConstraint::BumpSave(bump_save) => self.add_bump_save(bump_save),
+            SpannedConstraint::BelongsTo(belongs_to) => self.add_belongs_to(belongs_to),
+            SpannedConstraint::Owner(owner) => self.add_owner(owner),
+            SpannedConstraint::RentExempt(rent_exempt) => self.add_rent_exempt(rent_exempt),
+            SpannedConstraint::Expr(expr) => self.add_expr(expr),
         }
     }
 
@@ -325,12 +339,79 @@ impl PlainConstraintsBuilder {
         Ok(())
     }
 
+    pub fn add_address(&mut self, address: WithSpan<ConstraintAddress>) -> Result<()> {
+        if self.address.is_some() {
+            return Err(Error::new(address.span(), "Duplicated attribute"));
+        }
+
+        if self.seeds.is_some() {
+            return Err(Error::new(
+                address.span(),
+                "Only one of address or seeds may be used",
+            ));
+        }
+
+        self.address.replace(address.into_inner());
+
+        Ok(())
+    }
+
     pub fn add_seeds(&mut self, seeds: WithSpan<ConstraintSeeds>) -> Result<()> {
         if self.seeds.is_some() {
             return Err(Error::new(seeds.context(), "Duplicated account::seeds"));
         }
+
+        if self.address.is_some() {
+            return Err(Error::new(
+                seeds.span(),
+                "Only one of address or seeds may be used",
+            ));
+        }
+
         self.seeds.replace(seeds.into_inner());
 
+        Ok(())
+    }
+
+    pub fn add_bump(&mut self, bump: WithSpan<ConstraintBump>) -> Result<()> {
+        if self.seeds.is_none() {
+            return Err(Error::new(bump.context(), "must be after account::seeds"));
+        }
+
+        if self.bump_save.is_some() {
+            return Err(Error::new(
+                bump.context(),
+                "only one of account::bump and account::bump_save may be present",
+            ));
+        }
+
+        if self.bump.is_some() {
+            return Err(Error::new(bump.context(), "duplicated attribute"));
+        }
+
+        self.bump.replace(bump.into_inner());
+        Ok(())
+    }
+
+    pub fn add_bump_save(&mut self, bump_save: WithSpan<ConstraintBumpSave>) -> Result<()> {
+        if self.seeds.is_none() {
+            return Err(Error::new(
+                bump_save.context(),
+                "must be after account::seeds",
+            ));
+        }
+
+        if self.bump.is_some() {
+            return Err(Error::new(
+                bump_save.context(),
+                "only one of account::bump andaccount:: bump_save may be present",
+            ));
+        }
+        if self.bump_save.is_some() {
+            return Err(Error::new(bump_save.context(), "duplicated attribute"));
+        }
+
+        self.bump_save.replace(bump_save.into_inner());
         Ok(())
     }
 
@@ -386,7 +467,10 @@ impl PlainConstraintsBuilder {
             init: self.init,
             is_mut: self.r#mut,
             signer: self.signer,
+            address: self.address,
             seeds: self.seeds,
+            bump: self.bump,
+            bump_save: self.bump_save,
             belongs_to: self.belongs_to,
             owner: self.owner,
             rent_exempt: self.rent_exempt,
@@ -431,18 +515,66 @@ impl<'a> ToTokens for WithContext<&'a ConstraintSigner, &'a PlainField> {
     }
 }
 
+impl<'a> ToTokens for WithContext<&'a ConstraintAddress, &'a PlainField> {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let ident = &self.context.ident;
+        let info = match self.context.ty {
+            Ty::AccountInfo => quote! { #ident },
+            Ty::ProgramAccount(_) => quote! { #ident.to_account_info() },
+            Ty::ProgramState(_) => quote! { #ident.to_account_info() },
+            _ => unreachable!(),
+        };
+        let check = {
+            let decoded = bs58::decode(&self.value.value()).into_vec().unwrap(); // todo decode in parsing
+            let span = self.value.span();
+            quote_spanned! { span => anchor_lang::solana_program::pubkey::Pubkey::new(&[#(#decoded),*]) }
+        };
+        tokens.extend(quote! {
+            if !#info.key != #check {
+                return Err(anchor_lang::solana_program::program_error::ProgramError::Custom(1));
+            }
+        })
+    }
+}
+
 impl<'a> ToTokens for WithContext<&'a ConstraintSeeds, &'a PlainField> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let ident = &self.context.ident;
-        let seeds = &self.inner.seeds;
-        tokens.extend(quote! {
-            if *#ident.to_account_info().key != Pubkey::create_program_address(
-                &[#seeds],
-                program_id,
-            ).map_err(|_| anchor_lang::solana_program::program_error::ProgramError::Custom(1))? {
-                return Err(anchor_lang::solana_program::program_error::ProgramError::Custom(1)); // todo
-            }
-        })
+        let seeds = &self.seeds;
+        if let Some(ConstraintBump { expr: bump }) = &self.context.constraints.bump {
+            tokens.extend(
+                quote! {
+                    if *#ident.to_account_info().key != Pubkey::create_program_address(
+                        &[#seeds, &[#bump]],
+                        program_id,
+                    ).map_err(|_| anchor_lang::solana_program::program_error::ProgramError::Custom(1))? {
+                        return Err(anchor_lang::solana_program::program_error::ProgramError::Custom(1)); // todo
+                    }
+                });
+        } else if let Some(ConstraintBumpSave { expr: bump }) = &self.context.constraints.bump_save
+        {
+            tokens.extend(quote! {
+                {
+                    let __key_bump = Pubkey::find_program_address(
+                        &[#seeds],
+                        program_id,
+                    );
+                    if *#ident.to_account_info().key != __key_bump.0 {
+                        return Err(anchor_lang::solana_program::program_error::ProgramError::Custom(1)); // todo
+                    }
+                    #bump = __key_bump.1;
+                }
+            })
+        } else {
+            tokens.extend(quote! {
+                if *#ident.to_account_info().key != Pubkey::find_program_address(
+                    &[#seeds],
+                    program_id,
+                ).0 {
+                    return Err(anchor_lang::solana_program::program_error::ProgramError::Custom(1)); // todo
+                }
+            })
+        }
     }
 }
 

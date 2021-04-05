@@ -11,107 +11,126 @@ use syn::{
     token::Token,
     Path,
 };
-use syn::{
-    punctuated::Punctuated, token::Comma, Attribute, Error, Expr, Ident, LitStr, Result, Token,
-};
+use syn::{punctuated::Punctuated, Error, Expr, Ident, LitStr, Result, Token};
 
-use crate::{WithContext, WithSpan};
+use crate::WithSpan;
 
-use super::field::Ty;
-
-const INIT_NAME: &str = "init";
-const MUT_NAME: &str = "mut";
-const SIGNER_NAME: &str = "signer";
-const SEEDS_NAME: &str = "seeds";
-const BELONGS_TO_NAME: &str = "belongs_to";
-const OWNER_NAME: &str = "owner";
-const RENT_EXEMPT_NAME: &str = "rent_exempt";
-const EXPR_NAME: &str = "expr";
-
-pub enum Constraint {
+pub enum SpannedConstraint {
     Init(WithSpan<ConstraintInit>),
     Mut(WithSpan<ConstraintMut>),
     Signer(WithSpan<ConstraintSigner>),
+    Address(WithSpan<ConstraintAddress>),
     Seeds(WithSpan<ConstraintSeeds>),
+    Bump(WithSpan<ConstraintBump>),
+    BumpSave(WithSpan<ConstraintBumpSave>),
     BelongsTo(WithSpan<ConstraintBelongsTo>),
     Owner(WithSpan<ConstraintOwner>),
     RentExempt(WithSpan<ConstraintRentExempt>),
-    Expr(Box<WithSpan<ConstraintExpr>>),
+    Expr(WithSpan<ConstraintExpr>),
 }
 
-impl Spanned for Constraint {
+impl Spanned for SpannedConstraint {
     fn span(&self) -> Span {
         match self {
-            Constraint::Init(c) => c.span(),
-            Constraint::Mut(c) => c.span(),
-            Constraint::Signer(c) => c.span(),
-            Constraint::Seeds(c) => c.span(),
-            Constraint::BelongsTo(c) => c.span(),
-            Constraint::Owner(c) => c.span(),
-            Constraint::RentExempt(c) => c.span(),
-            Constraint::Expr(c) => c.span(),
+            SpannedConstraint::Init(c) => c.span(),
+            SpannedConstraint::Mut(c) => c.span(),
+            SpannedConstraint::Signer(c) => c.span(),
+            SpannedConstraint::Address(c) => c.span(),
+            SpannedConstraint::Seeds(c) => c.span(),
+            SpannedConstraint::Bump(c) => c.span(),
+            SpannedConstraint::BumpSave(c) => c.span(),
+            SpannedConstraint::BelongsTo(c) => c.span(),
+            SpannedConstraint::Owner(c) => c.span(),
+            SpannedConstraint::RentExempt(c) => c.span(),
+            SpannedConstraint::Expr(c) => c.span(),
         }
     }
 }
 
-// TODO: Constraint trait
+pub trait Constraint: Sized {
+    const NAME: &'static str;
 
-impl Parse for Constraint {
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>>;
+}
+
+impl Parse for SpannedConstraint {
     fn parse(input: ParseStream) -> Result<Self> {
-        let ident = input.fork().call(Ident::parse_any)?;
-        match ident.to_string().as_str() {
-            INIT_NAME => Ok(Self::Init(Parse::parse(input)?)),
-            MUT_NAME => Ok(Self::Mut(Parse::parse(input)?)),
-            SIGNER_NAME => Ok(Self::Signer(Parse::parse(input)?)),
-            SEEDS_NAME => Ok(Self::Seeds(Parse::parse(input)?)),
-            BELONGS_TO_NAME => Ok(Self::BelongsTo(Parse::parse(input)?)),
-            OWNER_NAME => Ok(Self::Owner(Parse::parse(input)?)),
-            RENT_EXEMPT_NAME => Ok(Self::RentExempt(Parse::parse(input)?)),
-            EXPR_NAME => Ok(Self::Expr(Box::new(Parse::parse(input)?))),
-            _ => Err(Error::new_spanned(ident, "Unknown attribute")),
+        let ident = input.call(Ident::parse_any)?;
+        macro_rules! try_parse {
+            ($ident:ident, $input:ident, $constraint:ty, $brach:ident) => {
+                if $ident == <$constraint as Constraint>::NAME {
+                    return Ok(Self::$brach(<$constraint as Constraint>::continue_parse(
+                        input,
+                        ident.span(),
+                    )?));
+                }
+            };
         }
+        try_parse!(ident, input, ConstraintInit, Init);
+        try_parse!(ident, input, ConstraintMut, Mut);
+        try_parse!(ident, input, ConstraintSigner, Signer);
+        try_parse!(ident, input, ConstraintAddress, Address);
+        try_parse!(ident, input, ConstraintSeeds, Seeds);
+        try_parse!(ident, input, ConstraintBump, Bump);
+        try_parse!(ident, input, ConstraintBumpSave, BumpSave);
+        try_parse!(ident, input, ConstraintBelongsTo, BelongsTo);
+        try_parse!(ident, input, ConstraintOwner, Owner);
+        try_parse!(ident, input, ConstraintRentExempt, RentExempt);
+        try_parse!(ident, input, ConstraintExpr, Expr);
+
+        Err(Error::new(ident.span(), "Unknown attribute"))
     }
 }
 
 #[derive(Debug)]
 pub struct ConstraintInit;
 
-impl Parse for WithSpan<ConstraintInit> {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let span = input.span();
-        let ident: Ident = input.parse()?;
-        if ident != INIT_NAME {
-            return Err(Error::new(span, "Expected init"));
-        }
-        Ok(Self::new(ConstraintInit, span))
+impl Constraint for ConstraintInit {
+    const NAME: &'static str = "init";
+
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
+        Ok(WithSpan::new(Self, start_span))
     }
 }
 
 #[derive(Debug)]
 pub struct ConstraintMut;
 
-impl Parse for WithSpan<ConstraintMut> {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let span = input.span();
-        let ident = input.call(Ident::parse_any)?;
-        if ident != MUT_NAME {
-            return Err(Error::new(span, "Expected mut"));
-        }
-        Ok(Self::new(ConstraintMut, span))
+impl Constraint for ConstraintMut {
+    const NAME: &'static str = "mut";
+
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
+        Ok(WithSpan::new(Self, start_span))
     }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ConstraintSigner;
 
-impl Parse for WithSpan<ConstraintSigner> {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let span = input.span();
-        let ident: Ident = input.parse()?;
-        if ident != SIGNER_NAME {
-            return Err(Error::new(span, "Expected signer"));
-        }
-        Ok(Self::new(ConstraintSigner, span))
+impl Constraint for ConstraintSigner {
+    const NAME: &'static str = "signer";
+
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
+        Ok(WithSpan::new(Self, start_span))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ConstraintAddress {
+    pub value: LitStr,
+}
+
+impl Constraint for ConstraintAddress {
+    const NAME: &'static str = "address";
+
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
+        input.parse::<Token![=]>()?;
+        let value: LitStr = input.parse()?;
+        let value_span = value.span();
+        Ok(WithSpan::new(
+            Self { value },
+            start_span.join(value_span).unwrap_or(start_span),
+        ))
     }
 }
 
@@ -120,21 +139,56 @@ pub struct ConstraintSeeds {
     pub seeds: Punctuated<Expr, Token![,]>,
 }
 
-impl Parse for WithSpan<ConstraintSeeds> {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let start_span = input.span();
-        let ident: Ident = input.parse()?;
-        if ident != SEEDS_NAME {
-            return Err(Error::new(start_span, "Expected seeds"));
-        }
+impl Constraint for ConstraintSeeds {
+    const NAME: &'static str = "seeds";
+
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
         input.parse::<Token![=]>()?;
         let content;
         let bracket = bracketed!(content in input);
-        Ok(Self::new(
-            ConstraintSeeds {
+        Ok(WithSpan::new(
+            Self {
                 seeds: content.parse_terminated(Expr::parse)?,
             },
             start_span.join(bracket.span).unwrap_or(start_span),
+        ))
+    }
+}
+
+#[derive(Debug)]
+pub struct ConstraintBump {
+    pub expr: Expr,
+}
+
+impl Constraint for ConstraintBump {
+    const NAME: &'static str = "bump";
+
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
+        input.parse::<Token![=]>()?;
+        let expr: Expr = input.parse()?;
+        let expr_span = expr.span();
+        Ok(WithSpan::new(
+            Self { expr },
+            start_span.join(expr_span).unwrap_or(start_span),
+        ))
+    }
+}
+
+#[derive(Debug)]
+pub struct ConstraintBumpSave {
+    pub expr: Expr,
+}
+
+impl Constraint for ConstraintBumpSave {
+    const NAME: &'static str = "bump_save";
+
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
+        input.parse::<Token![=]>()?;
+        let expr: Expr = input.parse()?;
+        let expr_span = expr.span();
+        Ok(WithSpan::new(
+            Self { expr },
+            start_span.join(expr_span).unwrap_or(start_span),
         ))
     }
 }
@@ -144,17 +198,14 @@ pub struct ConstraintBelongsTo {
     pub join_target: Ident,
 }
 
-impl Parse for WithSpan<ConstraintBelongsTo> {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let start_span = input.span();
-        let ident: Ident = input.parse()?;
-        if ident != BELONGS_TO_NAME {
-            return Err(Error::new(start_span, "Expected belongs_to"));
-        }
+impl Constraint for ConstraintBelongsTo {
+    const NAME: &'static str = "belongs_to";
+
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
         input.parse::<Token![=]>()?;
         let end_span = input.span();
-        Ok(Self::new(
-            ConstraintBelongsTo {
+        Ok(WithSpan::new(
+            Self {
                 join_target: input.parse()?,
             },
             start_span.join(end_span).unwrap_or(start_span),
@@ -169,22 +220,18 @@ pub enum ConstraintOwner {
     Skip,
 }
 
-impl Parse for WithSpan<ConstraintOwner> {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let start_span = input.span();
-        let ident: Ident = input.parse()?;
-        if ident != OWNER_NAME {
-            return Err(Error::new(start_span, "Expected owner"));
-        }
+impl Constraint for ConstraintOwner {
+    const NAME: &'static str = "owner";
 
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
         if input.peek(Token![=]) {
             input.parse::<Token![=]>()?;
 
             if input.peek(LitStr) {
                 let lit: LitStr = input.parse()?;
                 let lit_span = lit.span();
-                return Ok(Self::new(
-                    ConstraintOwner::Value(lit),
+                return Ok(WithSpan::new(
+                    Self::Value(lit),
                     start_span.join(lit_span).unwrap_or(start_span),
                 ));
             }
@@ -193,12 +240,12 @@ impl Parse for WithSpan<ConstraintOwner> {
             let span = start_span.join(ident.span()).unwrap_or(start_span);
 
             match ident.to_string().as_str() {
-                "skip" => Ok(Self::new(ConstraintOwner::Skip, span)),
-                "program" => Ok(Self::new(ConstraintOwner::Program, span)),
+                "skip" => Ok(WithSpan::new(Self::Skip, span)),
+                "program" => Ok(WithSpan::new(Self::Program, span)),
                 _ => Err(Error::new(span, "Expected skip or program")),
             }
         } else {
-            Ok(Self::new(ConstraintOwner::Program, start_span))
+            Ok(WithSpan::new(Self::Program, start_span))
         }
     }
 }
@@ -209,14 +256,10 @@ pub enum ConstraintRentExempt {
     Skip,
 }
 
-impl Parse for WithSpan<ConstraintRentExempt> {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let start_span = input.span();
-        let ident: Ident = input.parse()?;
-        if ident != RENT_EXEMPT_NAME {
-            return Err(Error::new(start_span, "Expected rent_exempt"));
-        }
+impl Constraint for ConstraintRentExempt {
+    const NAME: &'static str = "rent_exempt";
 
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
         if input.peek(Token![=]) {
             input.parse::<Token![=]>()?;
 
@@ -224,11 +267,11 @@ impl Parse for WithSpan<ConstraintRentExempt> {
             let span = start_span.join(ident.span()).unwrap_or(start_span);
 
             match ident.to_string().as_str() {
-                "skip" => Ok(Self::new(ConstraintRentExempt::Skip, span)),
+                "skip" => Ok(WithSpan::new(Self::Skip, span)),
                 _ => Err(Error::new(span, "Expected skip")),
             }
         } else {
-            Ok(Self::new(ConstraintRentExempt::Enforce, start_span))
+            Ok(WithSpan::new(Self::Enforce, start_span))
         }
     }
 }
@@ -236,18 +279,15 @@ impl Parse for WithSpan<ConstraintRentExempt> {
 #[derive(Debug)]
 pub struct ConstraintExpr(Expr);
 
-impl Parse for WithSpan<ConstraintExpr> {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let start_span = input.span();
-        let ident: Ident = input.parse()?;
-        if ident != EXPR_NAME {
-            return Err(Error::new(start_span, "Expected expr"));
-        }
+impl Constraint for ConstraintExpr {
+    const NAME: &'static str = "expr";
+
+    fn continue_parse(input: ParseStream, start_span: Span) -> Result<WithSpan<Self>> {
         input.parse::<Token![=]>()?;
         let expr: Expr = input.parse()?;
         let expr_span = expr.span();
-        Ok(Self::new(
-            ConstraintExpr(expr),
+        Ok(WithSpan::new(
+            Self(expr),
             start_span.join(expr_span).unwrap_or(start_span),
         ))
     }
