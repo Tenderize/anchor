@@ -538,7 +538,7 @@ impl<'a> ToTokens for WithContext<&'a ConstraintAddress, &'a PlainField> {
             quote_spanned! { span => anchor_lang::solana_program::pubkey::Pubkey::new(&[#(#decoded),*]) }
         };
         tokens.extend(quote! {
-            if !#info.key != #check {
+            if *#info.key != #check {
                 return Err(anchor_lang::solana_program::program_error::ProgramError::Custom(1));
             }
         })
