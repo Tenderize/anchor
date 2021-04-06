@@ -33,7 +33,7 @@ pub struct Create<'info> {
 
 #[derive(Accounts)]
 pub struct Increment<'info> {
-    #[account(mut, has_one = authority)]
+    #[account(mut, belongs_to = authority)]
     pub counter: ProgramAccount<'info, Counter>,
     #[account(signer)]
     pub authority: AccountInfo<'info>,

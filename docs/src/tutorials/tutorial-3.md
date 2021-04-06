@@ -8,10 +8,10 @@ This tutorial covers how to call one program from another, a process known as
 To get started, clone the repo.
 
 ```bash
-git clone https://github.com/project-serum/anchor
+git clone https://github.com/marinade-finance/anchor
 ```
 
-And change directories to the [example](https://github.com/project-serum/anchor/tree/master/examples/tutorial/basic-3).
+And change directories to the [example](https://github.com/marinade-finance/anchor/tree/master/examples/tutorial/basic-3).
 
 ```bash
 cd anchor/examples/tutorial/basic-3
@@ -70,5 +70,5 @@ retrieve the return value. In future work, Anchor should do this transparently.
 ## Conclusion
 
 That's it for the introductory tutorials for Anchor. For more, see the `examples/` directory in the
-[repository](https://github.com/project-serum/anchor). For feature requests or bugs, GitHub issues
+[repository](https://github.com/marinade-finance/anchor). For feature requests or bugs, GitHub issues
 are appreciated. For direct questions or support, join the [Serum Discord](https://discord.com/channels/739225212658122886/752530209848295555).

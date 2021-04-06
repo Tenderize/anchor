@@ -50,7 +50,7 @@ pub struct IdlAccounts<'info> {
     #[account(mut, belongs_to = authority)]
     pub idl: ProgramAccount<'info, IdlAccount>,
     #[account(signer)]
-    #[account(expr = if authority.key != &Pubkey::new_from_array([0u8; 32]) { Ok(()) } else { Err({ProgramError::InvalidArgument}) })]
+    #[account(expr = if authority.key == &Pubkey::new_from_array([0u8; 32]) { return Err(ProgramError::InvalidArgument) })]
     pub authority: AccountInfo<'info>,
 }
 
@@ -60,7 +60,7 @@ pub struct IdlCreateBuffer<'info> {
     #[account(init)]
     pub buffer: ProgramAccount<'info, IdlAccount>,
     #[account(signer)]
-    #[account(expr = if authority.key != &Pubkey::new_from_array([0u8; 32]) { Ok(()) } else { Err({ProgramError::InvalidArgument}) })]
+    #[account(expr = if authority.key == &Pubkey::new_from_array([0u8; 32]) { return Err(ProgramError::InvalidArgument) })]
     pub authority: AccountInfo<'info>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -70,13 +70,13 @@ pub struct IdlCreateBuffer<'info> {
 pub struct IdlSetBuffer<'info> {
     // The buffer with the new idl data.
     #[account(mut)]
-    #[account(expr = if buffer.authority == idl.authority { Ok(()) } else { Err({ProgramError::InvalidAccountData}) })]
+    #[account(expr = if buffer.authority == idl.authority { return Err(ProgramError::InvalidAccountData) })]
     pub buffer: ProgramAccount<'info, IdlAccount>,
     // The idl account to be updated with the buffer's data.
     #[account(mut, belongs_to = authority)]
     pub idl: ProgramAccount<'info, IdlAccount>,
     #[account(signer)]
-    #[account(expr = if authority.key != &Pubkey::new_from_array([0u8; 32]) { Ok(()) } else { Err({ProgramError::InvalidArgument}) })]
+    #[account(expr = if authority.key == &Pubkey::new_from_array([0u8; 32]) { return Err(ProgramError::InvalidArgument) })]
     pub authority: AccountInfo<'info>,
 }
 

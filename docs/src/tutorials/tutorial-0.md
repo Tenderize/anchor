@@ -8,10 +8,10 @@ Here, we introduce Anchor's core syntax elements and project workflow. This tuto
 To get started, clone the repo.
 
 ```bash
-git clone https://github.com/project-serum/anchor
+git clone https://github.com/marinade-finance/anchor
 ```
 
-And change directories to the [example](https://github.com/project-serum/anchor/tree/master/examples/tutorial/basic-0).
+And change directories to the [example](https://github.com/marinade-finance/anchor/tree/master/examples/tutorial/basic-0).
 
 ```bash
 cd anchor/examples/tutorial/basic-0
@@ -113,7 +113,7 @@ Take note of the program's deployed address. We'll use it next.
 
 Now that we've built a program, deployed it to a local cluster, and generated an IDL,
 we can use the IDL to generate a client to speak to our on-chain program. For example,
-see [client.js](https://github.com/project-serum/anchor/tree/master/examples/tutorial/basic-0/client.js).
+see [client.js](https://github.com/marinade-finance/anchor/tree/master/examples/tutorial/basic-0/client.js).
 
 <<< @/../examples/tutorial/basic-0/client.js#main
 
@@ -136,7 +136,7 @@ deploying a program, copy and pasting the address, and explicitly reading
 an IDL is all a bit tedious, and can easily get out of hand the more tests and the more
 programs you have. For this reason, we introduce the concept of a workspace.
 
-Inspecting [tests/basic_0.js](https://github.com/project-serum/anchor/tree/master/examples/tutorial/basic-0/tests/basic_0.js), we see the above example can be reduced to
+Inspecting [tests/basic_0.js](https://github.com/marinade-finance/anchor/tree/master/examples/tutorial/basic-0/tests/basic_0.js), we see the above example can be reduced to
 
 <<< @/../examples/tutorial/basic-0/tests/basic-0.js#code
 

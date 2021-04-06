@@ -23,10 +23,10 @@ accounts, allowing us to more easily reason about the security of our programs.
 To get started, clone the repo.
 
 ```bash
-git clone https://github.com/project-serum/anchor
+git clone https://github.com/marinade-finance/anchor
 ```
 
-And change directories to the [example](https://github.com/project-serum/anchor/tree/master/examples/tutorial/basic-2).
+And change directories to the [example](https://github.com/marinade-finance/anchor/tree/master/examples/tutorial/basic-2).
 
 ```bash
 cd anchor/examples/tutorial/basic-2
@@ -46,7 +46,7 @@ Let's focus on the `increment` instruction, specifically the `Increment` struct 
 ```rust
 #[derive(Accounts)]
 pub struct Increment<'info> {
-    #[account(mut, has_one = authority)]
+    #[account(mut, belongs_to = authority)]
     pub counter: ProgramAccount<'info, Counter>,
     #[account(signer)]
     pub authority: AccountInfo<'info>,
@@ -56,12 +56,12 @@ pub struct Increment<'info> {
 Here, several `#[account(..)]` attributes are used.
 
 * `mut`: tells the program to persist all changes to the account.
-* `has_one`: enforces the constraint that `Increment.counter.authority == Increment.authority.key`.
+* `belongs_to`: enforces the constraint that `Increment.counter.authority == Increment.authority.key`.
 * `signer`: enforces the constraint that the `authority` account **signed** the transaction.
 
 If any of these constraints do not hold, then the `increment` instruction will never be executed.
 This allows us to completely separate account validation from our program's business logic, allowing us
-to reason about each concern more easily. For more, see the full [list](https://github.com/project-serum/anchor#accounts-attribute-syntax) of account constraints.
+to reason about each concern more easily. For more, see the full [list](https://github.com/marinade-finance/anchor#accounts-attribute-syntax) of account constraints.
 
 ## Next Steps
 

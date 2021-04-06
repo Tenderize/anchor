@@ -10,10 +10,10 @@ singletons that can be operated over like any other account.
 To get started, clone the repo.
 
 ```bash
-git clone https://github.com/project-serum/anchor
+git clone https://github.com/marinade-finance/anchor
 ```
 
-And change directories to the [example](https://github.com/project-serum/anchor/tree/master/examples/tutorial/basic-4).
+And change directories to the [example](https://github.com/marinade-finance/anchor/tree/master/examples/tutorial/basic-4).
 
 ```bash
 cd anchor/examples/tutorial/basic-4

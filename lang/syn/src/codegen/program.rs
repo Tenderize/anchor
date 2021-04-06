@@ -336,6 +336,7 @@ pub fn generate_non_inlined_handlers(program: &Program) -> proc_macro2::TokenStr
                 let mut data = accounts.to.try_borrow_mut_data()?;
                 let dst: &mut [u8] = &mut data;
                 let mut cursor = std::io::Cursor::new(dst);
+                use anchor_lang::AccountSerialize;
                 idl_account.try_serialize(&mut cursor)?;
 
                 Ok(())

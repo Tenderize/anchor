@@ -14,7 +14,7 @@ use syn::parse_macro_input;
 /// ```ignore
 /// #[derive(Accounts)]
 /// pub struct Auth<'info> {
-///     #[account(mut, has_one = authority)]
+///     #[account(mut, belongs_to = authority)]
 ///     pub data: ProgramAccount<'info, MyData>,
 ///     #[account(signer)]
 ///     pub authority: AccountInfo<'info>,
@@ -38,14 +38,17 @@ use syn::parse_macro_input;
 ///
 /// | Attribute | Location | Description |
 /// |:--|:--|:--|
-/// | `#[account(signer)]` | On raw `AccountInfo` structs. | Checks the given account signed the transaction. |
+/// | `#[account(init)]` | On `ProgramAccount` structs. | Marks the account as being initialized, skipping the account discriminator check. Implies mut and owner (if owner = skip is not present) |
 /// | `#[account(mut)]` | On `AccountInfo`, `ProgramAccount` or `CpiAccount` structs. | Marks the account as mutable and persists the state transition. |
-/// | `#[account(init)]` | On `ProgramAccount` structs. | Marks the account as being initialized, skipping the account discriminator check. |
+/// | `#[account(signer)]` | On raw `AccountInfo` structs. | Checks the given account signed the transaction. |
+/// | `#[account(address = "<base58>")]` | On `AccountInfo`, `ProgramAccount` or `CpiAccount` structs. | Tests account key for equality |
+/// | `#[account(seeds = [<seeds>, ...])]` | On `AccountInfo`, `ProgramAccount` or `CpiAccount` structs | Seeds for the program derived address an `AccountInfo` struct represents separated by comma. Every seed may be any rust expression of type `&[u8]`. May be used in conjunction with one of bump or bump_save |
+/// | `#[account(bump = <bump_expr>)]` | On `AccountInfo`, `ProgramAccount` or `CpiAccount` structs | Expression of type `u8` used as bump seed for `Pubkey::create_program_address` when cheking seeds constraint |
+/// | `#[account(bump_save = <bump_field>)]` | On `AccountInfo`, `ProgramAccount` or `CpiAccount` structs | Address of `u8` field inside mutable account to store result of `Pubkey::find_program_address` after checking it in seeds constraint |
 /// | `#[account(belongs_to = <target>)]` | On `ProgramAccount` or `CpiAccount` structs | Checks the `target` field on the account matches the `target` field in the struct deriving `Accounts`. |
-/// | `#[account(has_one = <target>)]` | On `ProgramAccount` or `CpiAccount` structs | Semantically different, but otherwise the same as `belongs_to`. |
-/// | `#[account(seeds = [<seeds>])]` | On `AccountInfo` structs | Seeds for the program derived address an `AccountInfo` struct represents. |
-/// | `#[account("<literal>")]` | On any type deriving `Accounts` | Executes the given code literal as a constraint. The literal should evaluate to a boolean. |
-/// | `#[account(rent_exempt = <skip>)]` | On `AccountInfo` or `ProgramAccount` structs | Optional attribute to skip the rent exemption check. By default, all accounts marked with `#[account(init)]` will be rent exempt, and so this should rarely (if ever) be used. Similarly, omitting `= skip` will mark the account rent exempt. |
+/// | `#[account(owner (= "<base58>" / program / skip)?)]` | On `AccountInfo`, `ProgramAccount` or `CpiAccount` structs. | Tests account's owner key for equality |
+/// | `#[account(rent_exempt( = <skip>)?)]` | On `AccountInfo` or `ProgramAccount` structs | Optional attribute to skip the rent exemption check. By default, all accounts marked with `#[account(init)]` will be rent exempt, and so this should rarely (if ever) be used. Similarly, omitting `= skip` will mark the account rent exempt. |
+/// | `#[account(expr = <expr>)]` | On any type deriving `Accounts` | Executes the given expression. Return `Err(ProgramError::..)` if check is failed |
 #[proc_macro_derive(Accounts, attributes(account))]
 pub fn derive_anchor_deserialize(item: TokenStream) -> TokenStream {
     let strct = parse_macro_input!(item as AccountsStruct);

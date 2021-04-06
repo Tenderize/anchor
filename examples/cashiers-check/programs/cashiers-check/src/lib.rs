@@ -88,15 +88,15 @@ pub struct CreateCheck<'info> {
     #[account(init)]
     check: ProgramAccount<'info, Check>,
     // Check's token vault.
-    #[account(mut, "&vault.owner == check_signer.key")]
+    #[account(mut, expr = if &vault.owner != check_signer.key { return Err(ProgramError::InvalidAccountData) })]
     vault: CpiAccount<'info, TokenAccount>,
     // Program derived address for the check.
     check_signer: AccountInfo<'info>,
     // Token account the check is made from.
-    #[account(mut, has_one = owner)]
+    #[account(mut, belongs_to = owner)]
     from: CpiAccount<'info, TokenAccount>,
     // Token account the check is made to.
-    #[account("from.mint == to.mint")]
+    #[account(expr = if from.mint != to.mint { return Err(ProgramError::InvalidAccountData) })]
     to: CpiAccount<'info, TokenAccount>,
     // Owner of the `from` token account.
     owner: AccountInfo<'info>,
@@ -120,7 +120,7 @@ impl<'info> CreateCheck<'info> {
 
 #[derive(Accounts)]
 pub struct CashCheck<'info> {
-    #[account(mut, has_one = vault, has_one = to)]
+    #[account(mut, belongs_to = vault, belongs_to = to)]
     check: ProgramAccount<'info, Check>,
     #[account(mut)]
     vault: AccountInfo<'info>,
@@ -129,7 +129,7 @@ pub struct CashCheck<'info> {
         &[check.nonce],
     ])]
     check_signer: AccountInfo<'info>,
-    #[account(mut, has_one = owner)]
+    #[account(mut, belongs_to = owner)]
     to: CpiAccount<'info, TokenAccount>,
     #[account(signer)]
     owner: AccountInfo<'info>,
@@ -138,7 +138,7 @@ pub struct CashCheck<'info> {
 
 #[derive(Accounts)]
 pub struct CancelCheck<'info> {
-    #[account(mut, has_one = vault, has_one = from)]
+    #[account(mut, belongs_to = vault, has_one = from)]
     check: ProgramAccount<'info, Check>,
     #[account(mut)]
     vault: AccountInfo<'info>,
@@ -147,7 +147,7 @@ pub struct CancelCheck<'info> {
         &[check.nonce],
     ])]
     check_signer: AccountInfo<'info>,
-    #[account(mut, has_one = owner)]
+    #[account(mut, belongs_to = owner)]
     from: CpiAccount<'info, TokenAccount>,
     #[account(signer)]
     owner: AccountInfo<'info>,

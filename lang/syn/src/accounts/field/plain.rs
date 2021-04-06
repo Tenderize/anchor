@@ -221,6 +221,10 @@ impl<'a> ToTokens for WithContext<&'a PlainConstraints, &'a PlainField> {
             WithContext::new(signer, self.context).to_tokens(tokens);
         }
 
+        if let Some(adderess) = &self.inner.address {
+            WithContext::new(adderess, self.context).to_tokens(tokens);
+        }
+
         if let Some(seeds) = &self.inner.seeds {
             WithContext::new(seeds, self.context).to_tokens(tokens);
         }
@@ -235,6 +239,10 @@ impl<'a> ToTokens for WithContext<&'a PlainConstraints, &'a PlainField> {
 
         if let Some(rent_exempt) = &self.inner.rent_exempt {
             WithContext::new(rent_exempt, self.context).to_tokens(tokens);
+        }
+
+        for expr in &self.inner.exprs {
+            expr.to_tokens(tokens);
         }
     }
 }

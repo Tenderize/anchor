@@ -111,7 +111,7 @@ impl AccountsStruct {
                 use anchor_lang::prelude::borsh;
 
                 #[derive(anchor_lang::AnchorSerialize)]
-                struct #name {
+                pub struct #name {
                     #(#fields)*
                 }
 
