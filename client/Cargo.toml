@@ -1,15 +1,15 @@
 [package]
 name = "anchor-client"
-version = "0.3.0"
+version = "0.4.1"
 authors = ["Serum Foundation <foundation@projectserum.com>"]
 edition = "2018"
 license = "Apache-2.0"
 description = "Rust client for Anchor programs"
 
 [dependencies]
-anchor-lang = { path = "../lang", version = "0.3.0" }
+anchor-lang = { path = "../lang", version = "0.4.1" }
 anyhow = "1.0.32"
 regex = "1.4.5"
-solana-client = "=1.5.15"
-solana-sdk = "=1.5.15"
+solana-client = "1.6.3"
+solana-sdk = "1.6.3"
 thiserror = "1.0.20"

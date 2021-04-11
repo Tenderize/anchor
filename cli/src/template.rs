@@ -28,7 +28,7 @@ cpi = ["no-entrypoint"]
 default = []
 
 [dependencies]
-anchor-lang = "0.3.0"
+anchor-lang = "0.4.1"
 "#,
         name,
         name.to_snake_case(),
@@ -104,9 +104,7 @@ features = []"#
 
 pub fn lib_rs(name: &str) -> String {
     format!(
-        r#"#![feature(proc_macro_hygiene)]
-
-use anchor_lang::prelude::*;
+        r#"use anchor_lang::prelude::*;
 
 #[program]
 pub mod {} {{

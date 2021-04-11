@@ -43,6 +43,7 @@ mod vec;
 
 pub use crate::chunked_list::{ChunkAccount, ChunkedList, Error as ChunkError};
 // Internal module used by macros.
+#[doc(hidden)]
 pub mod __private {
     pub use base64;
 }

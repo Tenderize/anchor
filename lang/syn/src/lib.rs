@@ -160,6 +160,9 @@ impl<T, C> DerefMut for WithContext<T, C> {
 
 type WithSpan<T> = WithContext<T, Span>;
 
+#[derive(Debug)]
+pub struct ConstraintExecutable {}
+
 impl<T> Spanned for WithSpan<T> {
     fn span(&self) -> Span {
         self.context()

@@ -15,10 +15,10 @@ rustup component add rustfmt
 
 ## Install Solana
 
-See the solana [docs](https://docs.solana.com/cli/install-solana-cli-tools) for installation instructions. Version 1.5.5 is required. On macOS and Linux,
+See the solana [docs](https://docs.solana.com/cli/install-solana-cli-tools) for installation instructions. Version 1.6.3 is required. On macOS and Linux,
 
 ```bash
-sh -c "$(curl -sSfL https://release.solana.com/v1.5.5/install)"
+sh -c "$(curl -sSfL https://release.solana.com/v1.6.3/install)"
 ```
 
 ## Install Mocha
@@ -37,10 +37,10 @@ For now, we can use Cargo to install the CLI.
 cargo install --git https://github.com/marinade-finance/anchor anchor-cli --locked
 ```
 
-On Linux systems you may need to install additional dependencies. On Ubuntu,
+On Linux systems you may need to install additional dependencies if `cargo install` fails. On Ubuntu,
 
 ```bash
-sudo apt-get install -y pkg-config build-essential libudev-dev
+sudo apt-get update && apt-get upgrade && apt-get install -y pkg-config build-essential libudev-dev
 ```
 
 To install the JavaScript package.

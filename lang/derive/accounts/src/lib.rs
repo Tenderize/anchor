@@ -49,6 +49,7 @@ use syn::parse_macro_input;
 /// | `#[account(owner (= "<base58>" / program / skip)?)]` | On `AccountInfo`, `ProgramAccount` or `CpiAccount` structs. | Tests account's owner key for equality |
 /// | `#[account(rent_exempt( = <skip>)?)]` | On `AccountInfo` or `ProgramAccount` structs | Optional attribute to skip the rent exemption check. By default, all accounts marked with `#[account(init)]` will be rent exempt, and so this should rarely (if ever) be used. Similarly, omitting `= skip` will mark the account rent exempt. |
 /// | `#[account(expr = <expr>)]` | On any type deriving `Accounts` | Executes the given expression. Return `Err(ProgramError::..)` if check is failed |
+/// | `#[account(executable)]` | On `AccountInfo` structs | Checks the given account is an executable program. |
 #[proc_macro_derive(Accounts, attributes(account))]
 pub fn derive_anchor_deserialize(item: TokenStream) -> TokenStream {
     let strct = parse_macro_input!(item as AccountsStruct);

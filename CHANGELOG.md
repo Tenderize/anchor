@@ -13,16 +13,29 @@ incremented for features.
 
 ## Features
 
+* cli: Fund Anchor.toml configured wallet when testing ([#164](https://github.com/project-serum/anchor/pull/164)).
+* spl: Add initialize_account instruction for spl tokens ([#166](https://github.com/project-serum/anchor/pull/166)).
+
+## [0.4.1] - 2021-04-06
+
+* cli: Version verifiable docker builder ([#145](https://github.com/project-serum/anchor/pull/145)).
+
+## [0.4.0] - 2021-04-04
+
+## Features
+
 * cli: Specify test files to run ([#118](https://github.com/project-serum/anchor/pull/118)).
 * lang: Allow overriding the `#[state]` account's size ([#121](https://github.com/project-serum/anchor/pull/121)).
 * lang, client, ts: Add event emission and subscriptions ([#89](https://github.com/project-serum/anchor/pull/89)).
 * lang/account: Allow namespacing account discriminators ([#128](https://github.com/project-serum/anchor/pull/128)).
 * cli: TypeScript migrations ([#132](https://github.com/project-serum/anchor/pull/132)).
+* lang: Add `#[account(executable)]` attribute ([#140](https://github.com/project-serum/anchor/pull/140)).
 
 ## Breaking Changes
 
 * client: Replace url str with `Cluster` struct when constructing clients ([#89](https://github.com/project-serum/anchor/pull/89)).
 * lang: Changes the account discriminator of `IdlAccount` to be namespaced by `"internal"` ([#128](https://github.com/project-serum/anchor/pull/128)).
+* lang, spl, cli: Upgrade solana toolchain to 1.6.3, a major version upgrade even though only the minor version is incremented. This allows for the removal of `-#![feature(proc_macro_hygiene)]`. ([#139](https://github.com/project-serum/anchor/pull/139)).
 
 ## [0.3.0] - 2021-03-12
 
